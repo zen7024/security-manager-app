@@ -1,0 +1,34 @@
+# セキュリティ管理アプリ
+
+個人利用から始められる、ブラウザ完結型のセキュリティ管理アプリです。
+
+## 機能
+
+- IT資産の登録と重要度管理
+- 脆弱性の記録、深刻度、対応状況の管理
+- インシデントの記録とリスク値の可視化
+- 監査チェック項目の進捗管理
+- マスターパスワードで暗号化する個人用パスワードボルト
+- JSONバックアップと復元
+- iPhone向けPWA対応
+
+## ファイル構成
+
+- `security_management_app.html`
+- `index.html`
+- `manifest.webmanifest`
+- `sw.js`
+
+## ローカルで開く
+
+`security_management_app.html` をブラウザで開くだけで動作します。
+
+## 公開URL
+
+- 本番URL: `https://security-manager-app.netlify.app`
+
+## 注意
+
+- 通常データはブラウザの `localStorage` に保存されます
+- パスワードボルトは `PBKDF2 + AES-GCM` で暗号化されます
+- マスターパスワードを忘れると復号できません
