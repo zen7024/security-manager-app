@@ -124,6 +124,7 @@
     .btn-primary{background:#fff;color:var(--brand);font-weight:700}
     .btn-secondary{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.16)}
     .btn-danger{background:#fff1f1;color:var(--danger)}
+    .btn-ghost{background:#efe8da;color:#55473b}
 
     .grid{
       margin-top:22px;
@@ -318,6 +319,12 @@
       display:flex;
       gap:10px;
       flex-wrap:wrap;
+    }
+
+    .form-note{
+      font-size:13px;
+      color:var(--muted);
+      margin-top:8px;
     }
 
     .mini-list{
@@ -526,8 +533,10 @@
               </div>
             </div>
             <div class="form-actions">
-              <button class="btn btn-primary" type="submit">資産を追加</button>
+              <button class="btn btn-primary" type="submit" id="assetSubmitBtn">資産を追加</button>
+              <button class="btn btn-ghost" type="button" id="assetCancelBtn" hidden>編集をやめる</button>
             </div>
+            <div class="form-note" id="assetFormNote">新しい資産を登録できます。</div>
           </form>
           <div class="cards" id="assetList"></div>
         </div>
@@ -566,8 +575,10 @@
               </div>
             </div>
             <div class="form-actions">
-              <button class="btn btn-primary" type="submit">脆弱性を追加</button>
+              <button class="btn btn-primary" type="submit" id="vulnSubmitBtn">脆弱性を追加</button>
+              <button class="btn btn-ghost" type="button" id="vulnCancelBtn" hidden>編集をやめる</button>
             </div>
+            <div class="form-note" id="vulnFormNote">新しい脆弱性を登録できます。</div>
           </form>
           <div class="cards" id="vulnList"></div>
         </div>
@@ -609,8 +620,10 @@
               </div>
             </div>
             <div class="form-actions">
-              <button class="btn btn-primary" type="submit">インシデントを追加</button>
+              <button class="btn btn-primary" type="submit" id="incidentSubmitBtn">インシデントを追加</button>
+              <button class="btn btn-ghost" type="button" id="incidentCancelBtn" hidden>編集をやめる</button>
             </div>
+            <div class="form-note" id="incidentFormNote">新しいインシデントを登録できます。</div>
           </form>
           <div class="cards" id="incidentList"></div>
         </div>
@@ -644,8 +657,10 @@
               </div>
             </div>
             <div class="form-actions">
-              <button class="btn btn-primary" type="submit">監査項目を追加</button>
+              <button class="btn btn-primary" type="submit" id="auditSubmitBtn">監査項目を追加</button>
+              <button class="btn btn-ghost" type="button" id="auditCancelBtn" hidden>編集をやめる</button>
             </div>
+            <div class="form-note" id="auditFormNote">新しい監査項目を登録できます。</div>
           </form>
           <div class="cards" id="auditList"></div>
         </div>
@@ -740,8 +755,10 @@
               </div>
             </div>
             <div class="form-actions">
-              <button class="btn btn-primary" type="submit">ボルトに保存</button>
+              <button class="btn btn-primary" type="submit" id="vaultSubmitBtn">ボルトに保存</button>
+              <button class="btn btn-ghost" type="button" id="vaultCancelBtn" hidden>編集をやめる</button>
             </div>
+            <div class="form-note" id="vaultFormNote">新しいパスワード情報を暗号化して保存します。</div>
           </form>
           <div class="cards" id="vaultList" style="display:none;"></div>
         </div>
@@ -835,6 +852,76 @@
       unlocked: false,
       entries: [],
       masterPassword: ""
+    };
+    const editState = {
+      assets: null,
+      vulns: null,
+      incidents: null,
+      audits: null,
+      vault: null
+    };
+
+    const formConfigs = {
+      assets: {
+        formId: "assetForm",
+        submitId: "assetSubmitBtn",
+        cancelId: "assetCancelBtn",
+        noteId: "assetFormNote",
+        addLabel: "資産を追加",
+        editLabel: "資産を更新",
+        addNote: "新しい資産を登録できます。",
+        editNote: "編集中です。内容を更新して保存できます。",
+        tab: "assets",
+        fields: ["name", "owner", "type", "risk", "notes"]
+      },
+      vulns: {
+        formId: "vulnForm",
+        submitId: "vulnSubmitBtn",
+        cancelId: "vulnCancelBtn",
+        noteId: "vulnFormNote",
+        addLabel: "脆弱性を追加",
+        editLabel: "脆弱性を更新",
+        addNote: "新しい脆弱性を登録できます。",
+        editNote: "編集中です。対応状況や対策メモも更新できます。",
+        tab: "vulns",
+        fields: ["title", "asset", "severity", "status", "action"]
+      },
+      incidents: {
+        formId: "incidentForm",
+        submitId: "incidentSubmitBtn",
+        cancelId: "incidentCancelBtn",
+        noteId: "incidentFormNote",
+        addLabel: "インシデントを追加",
+        editLabel: "インシデントを更新",
+        addNote: "新しいインシデントを登録できます。",
+        editNote: "編集中です。影響度や内容を更新できます。",
+        tab: "incidents",
+        fields: ["title", "owner", "impact", "likelihood", "summary"]
+      },
+      audits: {
+        formId: "auditForm",
+        submitId: "auditSubmitBtn",
+        cancelId: "auditCancelBtn",
+        noteId: "auditFormNote",
+        addLabel: "監査項目を追加",
+        editLabel: "監査項目を更新",
+        addNote: "新しい監査項目を登録できます。",
+        editNote: "編集中です。結果や期限を更新できます。",
+        tab: "audits",
+        fields: ["control", "owner", "status", "due", "memo"]
+      },
+      vault: {
+        formId: "vaultEntryForm",
+        submitId: "vaultSubmitBtn",
+        cancelId: "vaultCancelBtn",
+        noteId: "vaultFormNote",
+        addLabel: "ボルトに保存",
+        editLabel: "ボルトを更新",
+        addNote: "新しいパスワード情報を暗号化して保存します。",
+        editNote: "編集中です。更新後に再暗号化して保存します。",
+        tab: "vault",
+        fields: ["service", "username", "password", "url", "mfa", "updatedAt", "notes"]
+      }
     };
 
     function loadMeta() {
@@ -982,6 +1069,7 @@
           </div>
           <div>${escapeHtml(item.notes || "補足なし")}</div>
           <div class="record-meta">
+            <button class="btn btn-ghost" data-edit="assets" data-id="${item.id}">編集</button>
             <button class="btn btn-danger" data-remove="assets" data-id="${item.id}">削除</button>
           </div>
         </article>
@@ -1008,6 +1096,7 @@
           </div>
           <div>${escapeHtml(item.action || "対策メモなし")}</div>
           <div class="record-meta">
+            <button class="btn btn-ghost" data-edit="vulns" data-id="${item.id}">編集</button>
             <button class="btn btn-danger" data-remove="vulns" data-id="${item.id}">削除</button>
           </div>
         </article>
@@ -1037,6 +1126,7 @@
             </div>
             <div>${escapeHtml(item.summary || "内容なし")}</div>
             <div class="record-meta">
+              <button class="btn btn-ghost" data-edit="incidents" data-id="${item.id}">編集</button>
               <button class="btn btn-danger" data-remove="incidents" data-id="${item.id}">削除</button>
             </div>
           </article>
@@ -1064,6 +1154,7 @@
           </div>
           <div>${escapeHtml(item.memo || "メモなし")}</div>
           <div class="record-meta">
+            <button class="btn btn-ghost" data-edit="audits" data-id="${item.id}">編集</button>
             <button class="btn btn-danger" data-remove="audits" data-id="${item.id}">削除</button>
           </div>
         </article>
@@ -1120,6 +1211,7 @@
             <div>${escapeHtml(item.notes || "メモなし")}</div>
           </div>
           <div class="record-meta">
+            <button class="btn btn-ghost" data-edit-vault="${item.id}">編集</button>
             <button class="btn btn-secondary" data-copy-password="${item.id}">パスワードをコピー</button>
             <button class="btn btn-danger" data-remove-vault="${item.id}">削除</button>
           </div>
@@ -1228,6 +1320,7 @@
       renderPriority();
       renderRiskMatrix();
       renderMobileStatus();
+      syncFormModes();
     }
 
     function addRecord(type, record) {
@@ -1235,11 +1328,64 @@
       renderAll();
     }
 
+    function updateRecord(type, id, record) {
+      state[type] = state[type].map(item => item.id === id ? { ...item, ...record } : item);
+      renderAll();
+    }
+
+    function setActiveTab(tabName) {
+      document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.tab === tabName));
+      document.querySelectorAll(".tab-pane").forEach(pane => pane.classList.toggle("active", pane.id === `tab-${tabName}`));
+    }
+
+    function fillForm(form, fields, values) {
+      fields.forEach(field => {
+        const control = form.elements.namedItem(field);
+        if (control) control.value = values[field] ?? "";
+      });
+    }
+
+    function syncFormMode(type) {
+      const config = formConfigs[type];
+      const editing = Boolean(editState[type]);
+      document.getElementById(config.submitId).textContent = editing ? config.editLabel : config.addLabel;
+      document.getElementById(config.cancelId).hidden = !editing;
+      document.getElementById(config.noteId).textContent = editing ? config.editNote : config.addNote;
+    }
+
+    function syncFormModes() {
+      Object.keys(formConfigs).forEach(syncFormMode);
+    }
+
+    function resetFormMode(type) {
+      editState[type] = null;
+      const config = formConfigs[type];
+      document.getElementById(config.formId).reset();
+      syncFormMode(type);
+    }
+
+    function startEditing(type, item) {
+      const config = formConfigs[type];
+      editState[type] = item.id;
+      setActiveTab(config.tab);
+      const form = document.getElementById(config.formId);
+      fillForm(form, config.fields, item);
+      syncFormMode(type);
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
     function handleSubmit(formId, type, mapper) {
       document.getElementById(formId).addEventListener("submit", event => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
-        addRecord(type, mapper(formData));
+        const record = mapper(formData);
+        if (editState[type]) {
+          updateRecord(type, editState[type], record);
+        } else {
+          addRecord(type, record);
+        }
+        editState[type] = null;
+        syncFormMode(type);
         event.currentTarget.reset();
       });
     }
@@ -1329,8 +1475,7 @@
         return;
       }
       const formData = new FormData(event.currentTarget);
-      vaultSession.entries.push({
-        id: crypto.randomUUID(),
+      const record = {
         service: String(formData.get("service") || ""),
         username: String(formData.get("username") || ""),
         password: String(formData.get("password") || ""),
@@ -1339,8 +1484,17 @@
         updatedAt: String(formData.get("updatedAt") || ""),
         notes: String(formData.get("notes") || ""),
         createdAt: new Date().toISOString()
-      });
+      };
+      if (editState.vault) {
+        vaultSession.entries = vaultSession.entries.map(item =>
+          item.id === editState.vault ? { ...item, ...record } : item
+        );
+      } else {
+        vaultSession.entries.push({ id: crypto.randomUUID(), ...record });
+      }
+      editState.vault = null;
       await persistVaultEntries();
+      syncFormMode("vault");
       event.currentTarget.reset();
     });
 
@@ -1363,15 +1517,33 @@
     });
 
     document.body.addEventListener("click", event => {
+      const editTarget = event.target.closest("[data-edit]");
+      if (editTarget) {
+        const type = editTarget.dataset.edit;
+        const item = state[type].find(row => row.id === editTarget.dataset.id);
+        if (item) startEditing(type, item);
+        return;
+      }
+
       const target = event.target.closest("[data-remove]");
       if (!target) return;
       const type = target.dataset.remove;
       const id = target.dataset.id;
       state[type] = state[type].filter(item => item.id !== id);
+      if (editState[type] === id) {
+        resetFormMode(type);
+      }
       renderAll();
     });
 
     document.body.addEventListener("click", async event => {
+      const editVaultTarget = event.target.closest("[data-edit-vault]");
+      if (editVaultTarget) {
+        const item = vaultSession.entries.find(entry => entry.id === editVaultTarget.dataset.editVault);
+        if (item) startEditing("vault", item);
+        return;
+      }
+
       const copyTarget = event.target.closest("[data-copy-password]");
       if (copyTarget) {
         const item = vaultSession.entries.find(entry => entry.id === copyTarget.dataset.copyPassword);
@@ -1387,8 +1559,17 @@
 
       const removeVaultTarget = event.target.closest("[data-remove-vault]");
       if (!removeVaultTarget) return;
+      if (editState.vault === removeVaultTarget.dataset.removeVault) {
+        resetFormMode("vault");
+      }
       vaultSession.entries = vaultSession.entries.filter(item => item.id !== removeVaultTarget.dataset.removeVault);
       await persistVaultEntries();
+    });
+
+    Object.entries(formConfigs).forEach(([type, config]) => {
+      document.getElementById(config.cancelId).addEventListener("click", () => {
+        resetFormMode(type);
+      });
     });
 
     document.getElementById("seedBtn").addEventListener("click", () => {
@@ -1398,6 +1579,7 @@
         entries: [],
         masterPassword: ""
       };
+      Object.keys(editState).forEach(type => { editState[type] = null; });
       renderAll();
     });
 
@@ -1409,6 +1591,7 @@
         entries: [],
         masterPassword: ""
       };
+      Object.keys(editState).forEach(type => { editState[type] = null; });
       renderAll();
     });
 
@@ -1452,6 +1635,7 @@
         entries: [],
         masterPassword: ""
       };
+      Object.keys(editState).forEach(type => { editState[type] = null; });
       renderAll();
       event.target.value = "";
     });
