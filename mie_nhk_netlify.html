@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>三重県 NHK ニュース</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
+      background: #f5f5f5;
+      color: #222;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a5276;
+      color: white;
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    header h1 {
+      font-size: 1.4rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    header h1 span.badge {
+      background: #e74c3c;
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.05em;
+    }
+
+    #reload-btn {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.4);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.2s;
+    }
+
+    #reload-btn:hover {
+      background: rgba(255,255,255,0.28);
+    }
+
+    #status {
+      text-align: center;
+      padding: 16px;
+      font-size: 0.9rem;
+      color: #555;
+      min-height: 48px;
+    }
+
+    #news-list {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 12px 16px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .news-card {
+      background: white;
+      border-radius: 10px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      transition: box-shadow 0.2s;
+    }
+
+    .news-card:hover {
+      box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+    }
+
+    .news-card a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .news-title {
+      font-size: 1rem;
+      font-weight: bold;
+      color: #1a5276;
+      line-height: 1.5;
+      margin-bottom: 6px;
+    }
+
+    .news-title:hover {
+      text-decoration: underline;
+    }
+
+    .news-desc {
+      font-size: 0.875rem;
+      color: #444;
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .news-date {
+      font-size: 0.78rem;
+      color: #888;
+    }
+
+    .error-msg {
+      color: #c0392b;
+      background: #fdf2f2;
+      border: 1px solid #f5b7b1;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 16px;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(26,82,118,0.2);
+      border-top-color: #1a5276;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 0.75rem;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>
+    📻 三重県 NHK ニュース
+    <span class="badge">RSS</span>
+  </h1>
+  <button id="reload-btn" onclick="loadNews()">🔄 更新</button>
+</header>
+
+<div id="status"></div>
+<div id="news-list"></div>
+
+<footer>
+  データソース: Google News（三重県 NHK）&nbsp;|&nbsp; Powered by rss2json.com
+</footer>
+
+<script>
+  const RSS_URL = 'https://news.google.com/rss/search?q=%E4%B8%89%E9%87%8D%E7%9C%8C+NHK&hl=ja&gl=JP&ceid=JP:ja';
+  const RSS2JSON = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
+
+  function setStatus(html) {
+    document.getElementById('status').innerHTML = html;
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return dateStr;
+    return d.toLocaleString('ja-JP', {
+      year: 'numeric', month: 'long', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  async function loadNews() {
+    const list = document.getElementById('news-list');
+    list.innerHTML = '';
+    setStatus('<span class="spinner"></span>ニュースを読み込み中…');
+
+    try {
+      const res = await fetch(RSS2JSON, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.status !== 'ok') throw new Error('RSSの取得に失敗: ' + data.message);
+
+      const items = data.items || [];
+      if (items.length === 0) {
+        setStatus('');
+        list.innerHTML = '<div class="error-msg">記事が見つかりませんでした。</div>';
+        return;
+      }
+
+      setStatus(`✅ ${items.length} 件の記事を取得しました（${new Date().toLocaleTimeString('ja-JP')}）`);
+
+      items.forEach(item => {
+        const title = item.title || '(タイトルなし)';
+        const link  = item.link  || '#';
+        const desc  = stripHtml(item.description || '').trim();
+        const pub   = item.pubDate || '';
+
+        const card = document.createElement('div');
+        card.className = 'news-card';
+        card.innerHTML = `
+          <a href="${link}" target="_blank" rel="noopener noreferrer">
+            <div class="news-title">${escHtml(title)}</div>
+          </a>
+          ${desc ? `<div class="news-desc">${escHtml(desc)}</div>` : ''}
+          ${pub  ? `<div class="news-date">🕐 ${formatDate(pub)}</div>` : ''}
+        `;
+        list.appendChild(card);
+      });
+
+    } catch (err) {
+      setStatus('');
+      list.innerHTML = `
+        <div class="error-msg">
+          ❌ ニュースの取得に失敗しました。<br>
+          <small>${escHtml(err.message)}</small><br><br>
+          しばらく待ってから「🔄 更新」を押してください。
+        </div>`;
+    }
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;')
+              .replace(/</g,'&lt;')
+              .replace(/>/g,'&gt;')
+              .replace(/"/g,'&quot;');
+  }
+
+  // HTMLタグを除去してプレーンテキストにする
+  function stripHtml(html) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+  }
+
+  // 起動時に自動読み込み
+  loadNews();
+</script>
+
+</body>
+</html>

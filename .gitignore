@@ -1,0 +1,13 @@
+# 大きなデータファイル（build_kanji_data.pyで自動生成）
+kanjidic2.xml
+kanjidic2.xml.gz
+
+# バックアップ
+*.bak
+
+# Mac
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
