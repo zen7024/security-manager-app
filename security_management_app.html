@@ -922,8 +922,25 @@
       }
     };
 
+    function getCookieValue(name) {
+      const prefix = `${name}=`;
+      const row = document.cookie
+        .split("; ")
+        .find(entry => entry.startsWith(prefix));
+      return row ? decodeURIComponent(row.slice(prefix.length)) : "";
+    }
+
+    function persistMetaState() {
+      const serialized = JSON.stringify(metaState);
+      try {
+        localStorage.setItem(META_KEY, serialized);
+      } catch (error) {
+        document.cookie = `${META_KEY}=${encodeURIComponent(serialized)}; path=/; max-age=31536000; samesite=lax`;
+      }
+    }
+
     function loadMeta() {
-      const raw = localStorage.getItem(META_KEY);
+      const raw = localStorage.getItem(META_KEY) || getCookieValue(META_KEY);
       if (!raw) {
         return {
           lastSavedAt: "",
@@ -955,7 +972,7 @@
     function saveState() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       metaState.lastSavedAt = new Date().toISOString();
-      localStorage.setItem(META_KEY, JSON.stringify(metaState));
+      persistMetaState();
     }
 
     function getSyncKeyHash() {
@@ -1729,13 +1746,13 @@
           return;
         }
         metaState.syncKeyHash = await sha256Hex(syncCode);
-        localStorage.setItem(META_KEY, JSON.stringify(metaState));
+        persistMetaState();
         event.currentTarget.reset();
         renderSyncStatus();
         alert("この端末に同期コードを保存しました。もう一方の端末にも同じコードを設定してください。");
       } catch (error) {
         console.error("Failed to save sync code", error);
-        alert("同期コードの保存に失敗しました。Safari を再読込しても直らない場合は、別タブで開き直してもう一度試してください。");
+        alert(`同期コードの保存に失敗しました: ${error.message || "unknown error"}`);
       }
     });
 
@@ -1743,7 +1760,7 @@
       metaState.syncKeyHash = "";
       metaState.syncLastPulledAt = "";
       metaState.syncLastPushedAt = "";
-      localStorage.setItem(META_KEY, JSON.stringify(metaState));
+      persistMetaState();
       renderSyncStatus();
     });
 
@@ -1759,7 +1776,7 @@
           device: getDeviceLabel()
         });
         metaState.syncLastPushedAt = response.updatedAt || new Date().toISOString();
-        localStorage.setItem(META_KEY, JSON.stringify(metaState));
+        persistMetaState();
         renderSyncStatus();
         alert("クラウドへ保存しました。");
       } catch (error) {
@@ -1783,6 +1800,7 @@
         state = normalizeState(response.payload);
         resetTransientSessions();
         metaState.syncLastPulledAt = response.updatedAt || new Date().toISOString();
+        persistMetaState();
         renderAll();
         alert("クラウドから最新データを読み込みました。");
       } catch (error) {
