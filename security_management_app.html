@@ -1739,7 +1739,8 @@
     document.getElementById("syncForm").addEventListener("submit", async event => {
       event.preventDefault();
       try {
-        const formData = new FormData(event.currentTarget);
+        const form = event.currentTarget;
+        const formData = new FormData(form);
         const syncCode = String(formData.get("syncCode") || "").trim();
         if (syncCode.length < 8) {
           alert("同期コードは8文字以上を推奨します。");
@@ -1747,7 +1748,7 @@
         }
         metaState.syncKeyHash = await sha256Hex(syncCode);
         persistMetaState();
-        event.currentTarget.reset();
+        form.reset();
         renderSyncStatus();
         alert("この端末に同期コードを保存しました。もう一方の端末にも同じコードを設定してください。");
       } catch (error) {
