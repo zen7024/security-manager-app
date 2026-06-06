@@ -982,6 +982,9 @@
     }
 
     async function sha256Hex(value) {
+      if (!globalThis.crypto?.subtle) {
+        throw new Error("Web Crypto API unavailable");
+      }
       const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
       return Array.from(new Uint8Array(digest))
         .map(byte => byte.toString(16).padStart(2, "0"))
@@ -1702,17 +1705,22 @@
 
     document.getElementById("syncForm").addEventListener("submit", async event => {
       event.preventDefault();
-      const formData = new FormData(event.currentTarget);
-      const syncCode = String(formData.get("syncCode") || "").trim();
-      if (syncCode.length < 8) {
-        alert("同期コードは8文字以上を推奨します。");
-        return;
+      try {
+        const formData = new FormData(event.currentTarget);
+        const syncCode = String(formData.get("syncCode") || "").trim();
+        if (syncCode.length < 8) {
+          alert("同期コードは8文字以上を推奨します。");
+          return;
+        }
+        metaState.syncKeyHash = await sha256Hex(syncCode);
+        localStorage.setItem(META_KEY, JSON.stringify(metaState));
+        event.currentTarget.reset();
+        renderSyncStatus();
+        alert("この端末に同期コードを保存しました。もう一方の端末にも同じコードを設定してください。");
+      } catch (error) {
+        console.error("Failed to save sync code", error);
+        alert("同期コードの保存に失敗しました。Safari を再読込してもう一度試してください。");
       }
-      metaState.syncKeyHash = await sha256Hex(syncCode);
-      localStorage.setItem(META_KEY, JSON.stringify(metaState));
-      event.currentTarget.reset();
-      renderSyncStatus();
-      alert("この端末に同期コードを保存しました。もう一方の端末にも同じコードを設定してください。");
     });
 
     document.getElementById("syncDisconnectBtn").addEventListener("click", () => {
