@@ -950,6 +950,7 @@
         return {
           lastSavedAt: "",
           syncKeyHash: "",
+          syncKeyAliases: [],
           syncLastPulledAt: "",
           syncLastPushedAt: ""
         };
@@ -958,6 +959,7 @@
         return {
           lastSavedAt: "",
           syncKeyHash: "",
+          syncKeyAliases: [],
           syncLastPulledAt: "",
           syncLastPushedAt: "",
           ...JSON.parse(raw)
@@ -966,6 +968,7 @@
         return {
           lastSavedAt: "",
           syncKeyHash: "",
+          syncKeyAliases: [],
           syncLastPulledAt: "",
           syncLastPushedAt: ""
         };
@@ -982,6 +985,12 @@
 
     function getSyncKeyHash() {
       return String(metaState.syncKeyHash || "");
+    }
+
+    function getSyncKeyCandidates() {
+      return [getSyncKeyHash(), ...(Array.isArray(metaState.syncKeyAliases) ? metaState.syncKeyAliases : [])]
+        .map(value => String(value || "").trim())
+        .filter((value, index, list) => value && list.indexOf(value) === index);
     }
 
     function getSyncStatusText() {
@@ -1020,13 +1029,26 @@
     }
 
     async function sha256Hex(value) {
+      const fallbackHash = fallbackSyncHash(value);
       if (!globalThis.crypto?.subtle || typeof TextEncoder === "undefined") {
-        return fallbackSyncHash(value);
+        return fallbackHash;
       }
-      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-      return Array.from(new Uint8Array(digest))
-        .map(byte => byte.toString(16).padStart(2, "0"))
-        .join("");
+      try {
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+        return Array.from(new Uint8Array(digest))
+          .map(byte => byte.toString(16).padStart(2, "0"))
+          .join("");
+      } catch (error) {
+        return fallbackHash;
+      }
+    }
+
+    async function deriveSyncKeySet(syncCode) {
+      const fallbackHash = fallbackSyncHash(syncCode);
+      const cryptoHash = await sha256Hex(syncCode);
+      return [fallbackHash, cryptoHash]
+        .map(value => String(value || "").trim())
+        .filter((value, index, list) => value && list.indexOf(value) === index);
     }
 
     function normalizeState(payload) {
@@ -1751,7 +1773,9 @@
           alert("同期コードは8文字以上を推奨します。");
           return;
         }
-        metaState.syncKeyHash = await sha256Hex(syncCode);
+        const syncKeySet = await deriveSyncKeySet(syncCode);
+        metaState.syncKeyHash = syncKeySet[0] || "";
+        metaState.syncKeyAliases = syncKeySet.slice(1);
         persistMetaState();
         form.reset();
         renderSyncStatus();
@@ -1764,6 +1788,7 @@
 
     document.getElementById("syncDisconnectBtn").addEventListener("click", () => {
       metaState.syncKeyHash = "";
+      metaState.syncKeyAliases = [];
       metaState.syncLastPulledAt = "";
       metaState.syncLastPushedAt = "";
       persistMetaState();
@@ -1776,11 +1801,15 @@
         return;
       }
       try {
-        const response = await callSyncApi("PUT", {
-          key: getSyncKeyHash(),
-          payload: state,
-          device: getDeviceLabel()
-        });
+        const syncKeys = getSyncKeyCandidates();
+        let response = null;
+        for (const key of syncKeys) {
+          response = await callSyncApi("PUT", {
+            key,
+            payload: state,
+            device: getDeviceLabel()
+          });
+        }
         metaState.syncLastPushedAt = response.updatedAt || new Date().toISOString();
         persistMetaState();
         renderSyncStatus();
@@ -1796,9 +1825,15 @@
         return;
       }
       try {
-        const response = await callSyncApi("POST", {
-          key: getSyncKeyHash()
-        });
+        let response = null;
+        for (const key of getSyncKeyCandidates()) {
+          try {
+            response = await callSyncApi("POST", { key });
+            if (response?.payload) break;
+          } catch (error) {
+            response = null;
+          }
+        }
         if (!response || !response.payload) {
           alert("まだクラウド上に保存データがありません。先にどちらかの端末でクラウドへ保存してください。");
           return;
