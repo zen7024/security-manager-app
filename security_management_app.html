@@ -981,9 +981,25 @@
       return navigator.userAgentData?.platform || navigator.platform || "browser";
     }
 
+    function fallbackSyncHash(value) {
+      // Safari で Web Crypto が使えない場合の最小フォールバック
+      let hashA = 0x811c9dc5;
+      let hashB = 0x01000193;
+      for (const char of value) {
+        const code = char.codePointAt(0) || 0;
+        hashA ^= code;
+        hashA = Math.imul(hashA, 0x01000193) >>> 0;
+        hashB ^= (code << 7) ^ (code >>> 3);
+        hashB = Math.imul(hashB, 0x85ebca6b) >>> 0;
+      }
+      const partA = hashA.toString(16).padStart(8, "0");
+      const partB = hashB.toString(16).padStart(8, "0");
+      return `${partA}${partB}`.repeat(4);
+    }
+
     async function sha256Hex(value) {
-      if (!globalThis.crypto?.subtle) {
-        throw new Error("Web Crypto API unavailable");
+      if (!globalThis.crypto?.subtle || typeof TextEncoder === "undefined") {
+        return fallbackSyncHash(value);
       }
       const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
       return Array.from(new Uint8Array(digest))
@@ -1719,7 +1735,7 @@
         alert("この端末に同期コードを保存しました。もう一方の端末にも同じコードを設定してください。");
       } catch (error) {
         console.error("Failed to save sync code", error);
-        alert("同期コードの保存に失敗しました。Safari を再読込してもう一度試してください。");
+        alert("同期コードの保存に失敗しました。Safari を再読込しても直らない場合は、別タブで開き直してもう一度試してください。");
       }
     });
 
