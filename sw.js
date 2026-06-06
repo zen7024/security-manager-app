@@ -1,4 +1,4 @@
-const CACHE_NAME = "security-management-app-v2";
+const CACHE_NAME = "security-management-app-v3";
 const APP_SHELL_ASSETS = [
   "./manifest.webmanifest",
   "./sw.js"
