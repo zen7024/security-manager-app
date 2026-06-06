@@ -88,7 +88,7 @@
       margin-top:18px;
       display:grid;
       gap:10px;
-      grid-template-columns:repeat(3, minmax(0, 1fr));
+      grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
     }
 
     .hero-chip{
@@ -459,21 +459,16 @@
         <button class="btn btn-secondary" id="exportBtn">JSONを書き出し</button>
         <label class="btn btn-secondary" for="importFile">JSONを読み込み</label>
         <input type="file" id="importFile" accept="application/json" hidden>
-        <button class="btn btn-secondary" id="copyUrlBtn">URLをコピー</button>
         <button class="btn btn-danger" id="resetBtn">全データ初期化</button>
       </div>
       <div class="hero-status">
-        <div class="hero-chip">
-          <div class="hero-chip-label">現在の利用モード</div>
-          <div class="hero-chip-value" id="modeLabel">ローカル利用</div>
-        </div>
         <div class="hero-chip">
           <div class="hero-chip-label">最終保存</div>
           <div class="hero-chip-value" id="lastSavedLabel">未保存</div>
         </div>
         <div class="hero-chip">
-          <div class="hero-chip-label">iPhone利用の目安</div>
-          <div class="hero-chip-value" id="iphoneLabel">公開URL化で外出先利用</div>
+          <div class="hero-chip-label">同期状態</div>
+          <div class="hero-chip-value" id="syncStatusLabel">未接続</div>
         </div>
       </div>
     </section>
@@ -787,22 +782,25 @@
 
         <div class="panel-head" style="margin-top:22px;">
           <div>
-            <h2>iPhoneで使う手順</h2>
-            <div class="sub">外出先利用のための最短ルートです。</div>
+            <h2>端末同期</h2>
+            <div class="sub">同じ同期コードを設定した端末どうしで、資産台帳や監査チェックを共有します。</div>
           </div>
         </div>
-        <div class="guide-list">
-          <div class="guide-step">
-            <strong>1. 公開URLで開く</strong>
-            `file://` のままではiPhoneから外では使えません。NetlifyやGitHub Pagesなどに置いて `https://` URL にします。
-          </div>
-          <div class="guide-step">
-            <strong>2. Safariでホーム画面に追加</strong>
-            共有メニューから「ホーム画面に追加」を押すと、アプリに近い見た目で開けます。
-          </div>
-          <div class="guide-step">
-            <strong>3. 定期的にJSONを書き出す</strong>
-            個人利用の間はブラウザ保存なので、週1回くらいバックアップしておくと安心です。
+        <div class="vault-box">
+          <form id="syncForm">
+            <div class="field">
+              <label for="syncCode">同期コード</label>
+              <input id="syncCode" name="syncCode" type="password" placeholder="Mac と iPhone で同じコードを入力">
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit">同期コードを保存</button>
+              <button class="btn btn-ghost" type="button" id="syncDisconnectBtn">接続解除</button>
+            </div>
+          </form>
+          <div class="form-note" id="syncNote">まだ同期コードは設定されていません。</div>
+          <div class="form-actions">
+            <button class="btn btn-secondary" type="button" id="syncPushBtn">クラウドへ保存</button>
+            <button class="btn btn-secondary" type="button" id="syncPullBtn">クラウドから読込</button>
           </div>
         </div>
       </aside>
@@ -927,12 +925,28 @@
     function loadMeta() {
       const raw = localStorage.getItem(META_KEY);
       if (!raw) {
-        return { lastSavedAt: "" };
+        return {
+          lastSavedAt: "",
+          syncKeyHash: "",
+          syncLastPulledAt: "",
+          syncLastPushedAt: ""
+        };
       }
       try {
-        return JSON.parse(raw);
+        return {
+          lastSavedAt: "",
+          syncKeyHash: "",
+          syncLastPulledAt: "",
+          syncLastPushedAt: "",
+          ...JSON.parse(raw)
+        };
       } catch (error) {
-        return { lastSavedAt: "" };
+        return {
+          lastSavedAt: "",
+          syncKeyHash: "",
+          syncLastPulledAt: "",
+          syncLastPushedAt: ""
+        };
       }
     }
 
@@ -942,6 +956,76 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       metaState.lastSavedAt = new Date().toISOString();
       localStorage.setItem(META_KEY, JSON.stringify(metaState));
+    }
+
+    function getSyncKeyHash() {
+      return String(metaState.syncKeyHash || "");
+    }
+
+    function getSyncStatusText() {
+      if (!getSyncKeyHash()) return "未接続";
+      if (metaState.syncLastPulledAt || metaState.syncLastPushedAt) return "接続済み";
+      return "コード保存済み";
+    }
+
+    function getSyncNoteText() {
+      if (!getSyncKeyHash()) {
+        return "まだ同期コードは設定されていません。";
+      }
+      const pulled = metaState.syncLastPulledAt ? `読込: ${formatDateTime(metaState.syncLastPulledAt)}` : "読込: 未実行";
+      const pushed = metaState.syncLastPushedAt ? `保存: ${formatDateTime(metaState.syncLastPushedAt)}` : "保存: 未実行";
+      return `${pulled} / ${pushed}`;
+    }
+
+    function getDeviceLabel() {
+      return navigator.userAgentData?.platform || navigator.platform || "browser";
+    }
+
+    async function sha256Hex(value) {
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+      return Array.from(new Uint8Array(digest))
+        .map(byte => byte.toString(16).padStart(2, "0"))
+        .join("");
+    }
+
+    function normalizeState(payload) {
+      return {
+        assets: Array.isArray(payload?.assets) ? payload.assets : [],
+        vulns: Array.isArray(payload?.vulns) ? payload.vulns : [],
+        incidents: Array.isArray(payload?.incidents) ? payload.incidents : [],
+        audits: Array.isArray(payload?.audits) ? payload.audits : [],
+        passwordVault: payload?.passwordVault || null
+      };
+    }
+
+    function resetTransientSessions() {
+      vaultSession = {
+        unlocked: false,
+        entries: [],
+        masterPassword: ""
+      };
+      Object.keys(editState).forEach(type => { editState[type] = null; });
+    }
+
+    async function callSyncApi(method, body) {
+      const response = await fetch("/api/sync", {
+        method,
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (response.status === 404) {
+        return null;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "同期APIの呼び出しに失敗しました。");
+      }
+
+      return response.json();
     }
 
     function severityLabel(value) {
@@ -1300,13 +1384,12 @@
       }).format(date);
     }
 
-    function renderMobileStatus() {
-      const isFile = location.protocol === "file:";
-      document.getElementById("modeLabel").textContent = isFile ? "ローカル利用" : "公開URL利用";
-      document.getElementById("lastSavedLabel").textContent = formatDateTime(metaState.lastSavedAt);
-      document.getElementById("iphoneLabel").textContent = isFile
-        ? "外出先利用には公開が必要"
-        : "Safariでホーム画面追加OK";
+    function renderSyncStatus() {
+      document.getElementById("syncStatusLabel").textContent = getSyncStatusText();
+      document.getElementById("syncNote").textContent = getSyncNoteText();
+      document.getElementById("syncDisconnectBtn").disabled = !getSyncKeyHash();
+      document.getElementById("syncPushBtn").disabled = !getSyncKeyHash();
+      document.getElementById("syncPullBtn").disabled = !getSyncKeyHash();
     }
 
     function renderAll() {
@@ -1319,7 +1402,8 @@
       renderVault();
       renderPriority();
       renderRiskMatrix();
-      renderMobileStatus();
+      document.getElementById("lastSavedLabel").textContent = formatDateTime(metaState.lastSavedAt);
+      renderSyncStatus();
       syncFormModes();
     }
 
@@ -1605,39 +1689,81 @@
       URL.revokeObjectURL(url);
     });
 
-    document.getElementById("copyUrlBtn").addEventListener("click", async () => {
-      if (location.protocol === "file:") {
-        alert("今はローカルファイルで開いています。iPhoneで外出先利用するには、まず https:// で公開してください。");
-        return;
-      }
-      try {
-        await navigator.clipboard.writeText(location.href);
-        alert("URLをコピーしました。iPhoneのSafariで開いて使えます。");
-      } catch (error) {
-        alert("URLコピーに失敗しました。ブラウザのアドレスバーから直接共有してください。");
-      }
-    });
-
     document.getElementById("importFile").addEventListener("change", async event => {
       const [file] = event.target.files;
       if (!file) return;
       const text = await file.text();
       const parsed = JSON.parse(text);
-      state = {
-        assets: parsed.assets || [],
-        vulns: parsed.vulns || [],
-        incidents: parsed.incidents || [],
-        audits: parsed.audits || [],
-        passwordVault: parsed.passwordVault || null
-      };
-      vaultSession = {
-        unlocked: false,
-        entries: [],
-        masterPassword: ""
-      };
-      Object.keys(editState).forEach(type => { editState[type] = null; });
+      state = normalizeState(parsed);
+      resetTransientSessions();
       renderAll();
       event.target.value = "";
+    });
+
+    document.getElementById("syncForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const formData = new FormData(event.currentTarget);
+      const syncCode = String(formData.get("syncCode") || "").trim();
+      if (syncCode.length < 8) {
+        alert("同期コードは8文字以上を推奨します。");
+        return;
+      }
+      metaState.syncKeyHash = await sha256Hex(syncCode);
+      localStorage.setItem(META_KEY, JSON.stringify(metaState));
+      event.currentTarget.reset();
+      renderSyncStatus();
+      alert("この端末に同期コードを保存しました。もう一方の端末にも同じコードを設定してください。");
+    });
+
+    document.getElementById("syncDisconnectBtn").addEventListener("click", () => {
+      metaState.syncKeyHash = "";
+      metaState.syncLastPulledAt = "";
+      metaState.syncLastPushedAt = "";
+      localStorage.setItem(META_KEY, JSON.stringify(metaState));
+      renderSyncStatus();
+    });
+
+    document.getElementById("syncPushBtn").addEventListener("click", async () => {
+      if (!getSyncKeyHash()) {
+        alert("先に同期コードを保存してください。");
+        return;
+      }
+      try {
+        const response = await callSyncApi("PUT", {
+          key: getSyncKeyHash(),
+          payload: state,
+          device: getDeviceLabel()
+        });
+        metaState.syncLastPushedAt = response.updatedAt || new Date().toISOString();
+        localStorage.setItem(META_KEY, JSON.stringify(metaState));
+        renderSyncStatus();
+        alert("クラウドへ保存しました。");
+      } catch (error) {
+        alert("クラウド保存に失敗しました。Netlify の同期APIが使える状態か確認してください。");
+      }
+    });
+
+    document.getElementById("syncPullBtn").addEventListener("click", async () => {
+      if (!getSyncKeyHash()) {
+        alert("先に同期コードを保存してください。");
+        return;
+      }
+      try {
+        const response = await callSyncApi("POST", {
+          key: getSyncKeyHash()
+        });
+        if (!response || !response.payload) {
+          alert("まだクラウド上に保存データがありません。先にどちらかの端末でクラウドへ保存してください。");
+          return;
+        }
+        state = normalizeState(response.payload);
+        resetTransientSessions();
+        metaState.syncLastPulledAt = response.updatedAt || new Date().toISOString();
+        renderAll();
+        alert("クラウドから最新データを読み込みました。");
+      } catch (error) {
+        alert("クラウド読込に失敗しました。Netlify の同期APIが使える状態か確認してください。");
+      }
     });
 
     if ("serviceWorker" in navigator && location.protocol !== "file:") {

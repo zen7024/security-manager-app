@@ -1,7 +1,7 @@
 {
   "name": "セキュリティ管理アプリ",
   "short_name": "セキュリティ管理",
-  "start_url": "./security_management_app.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#f4efe6",
   "theme_color": "#0f5c4d",

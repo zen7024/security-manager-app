@@ -11,3 +11,6 @@ kanjidic2.xml.gz
 # Python
 __pycache__/
 *.pyc
+
+# Netlify手動アップロード用
+netlify_security_manager_deploy/
